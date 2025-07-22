@@ -3,13 +3,31 @@ import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
+import * as cookieParser from 'cookie-parser';
+import * as path from 'path';
+import * as fs from 'fs';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const httpsOptions = {
+    key: fs.readFileSync(path.join(__dirname, '../..', 'ssl', 'key.pem')),
+    cert: fs.readFileSync(path.join(__dirname, '../..', 'ssl', 'cert.pem')),
+  };
 
-  app.use(helmet());
+  const app = await NestFactory.create(AppModule, {
+    httpsOptions,
+  });
+
+  app.use(helmet({ crossOriginOpenerPolicy: false, originAgentCluster: false }));
   app.enableCors();
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+  app.use(cookieParser());
+
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  );
 
   const config = new DocumentBuilder()
     .setTitle('Sanatio Doctor Service')
@@ -20,7 +38,7 @@ async function bootstrap() {
   const doc = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, doc);
 
-  await app.listen(process.env.PORT || 3001);
-  console.log(`Doctor service listening on port ${process.env.PORT || 3001}`);
+  await app.listen(process.env.PORT || 4004);
+  console.log(` Serveur HTTPS démarré sur https://localhost:4004/api/docs`);
 }
 bootstrap();
