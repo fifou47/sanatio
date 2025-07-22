@@ -1,9 +1,13 @@
-import { SubscribeMessage, WebSocketGateway } from '@nestjs/websockets';
+import { WebSocketGateway, SubscribeMessage, MessageBody } from '@nestjs/websockets';
+import { ChatService } from './chat.service';
+import { SendMessageDto } from './dto/send-message.dto';
 
-@WebSocketGateway()
+@WebSocketGateway({ namespace: '/chat' })
 export class ChatGateway {
+  constructor(private svc: ChatService) {}
+
   @SubscribeMessage('message')
-  handleMessage(client: any, payload: any): string {
-    return 'Hello world!';
+  async onMessage(@MessageBody() dto: SendMessageDto) {
+    return this.svc.handleMessage(dto);
   }
 }

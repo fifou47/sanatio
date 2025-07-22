@@ -1,9 +1,12 @@
-import { SubscribeMessage, WebSocketGateway } from '@nestjs/websockets';
+import { WebSocketGateway, SubscribeMessage } from '@nestjs/websockets';
+import { VoiceService } from './voice.service';
 
-@WebSocketGateway()
+@WebSocketGateway({ namespace: '/voice' })
 export class VoiceGateway {
-  @SubscribeMessage('message')
-  handleMessage(client: any, payload: any): string {
-    return 'Hello world!';
+  constructor(private svc: VoiceService) {}
+
+  @SubscribeMessage('startCall')
+  handleStartCall(client: any, payload: { consultationId: string }) {
+    return this.svc.startCall(payload.consultationId);
   }
 }
