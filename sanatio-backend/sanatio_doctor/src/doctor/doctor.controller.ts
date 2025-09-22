@@ -29,6 +29,13 @@ export class DoctorController {
   @ApiOperation({ summary: 'Search doctors by filters' })
   @ApiQuery({ name: 'specialties', required: false, type: [String] })
   @ApiQuery({ name: 'maxRate', required: false, type: Number })
+  @ApiQuery({ name: 'languages', required: false, type: [String] })
+  @ApiQuery({ name: 'minRating', required: false, type: Number })
+  @ApiQuery({ name: 'isTelemedicine', required: false, type: Boolean })
+  @ApiQuery({ name: 'availabilityMode', required: false, enum: ['ONSITE','REMOTE','BOTH'] })
+  @ApiQuery({ name: 'lat', required: false, type: Number })
+  @ApiQuery({ name: 'lng', required: false, type: Number })
+  @ApiQuery({ name: 'maxDistanceKm', required: false, type: Number })
   search(@Query() dto: SearchDoctorDto) {
     return this.svc.search(dto);
   }

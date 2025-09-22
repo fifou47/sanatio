@@ -20,6 +20,9 @@ export class User {
 
   @Prop({ type: [String], default: [] })
   roles: string[];
+
+  @Prop({ default: false })
+  autoLockEnabled: boolean;
 }
 
 export type UserDocument = User & Document;

@@ -19,19 +19,19 @@ export class PatientService {
   }
 
   async findOne(id: string): Promise<Patient> {
-    const patient = await this.patientModel.findOne({ id });
+    const patient = await this.patientModel.findById(id).exec();
     if (!patient) throw new NotFoundException('Patient non trouvé');
     return patient;
   }
 
   async update(id: string, dto: UpdatePatientDto): Promise<Patient> {
-    const updated = await this.patientModel.findOneAndUpdate({ id }, dto, { new: true });
+    const updated = await this.patientModel.findByIdAndUpdate(id, dto, { new: true }).exec();
     if (!updated) throw new NotFoundException('Patient non trouvé');
     return updated;
   }
 
   async remove(id: string): Promise<void> {
-    const res = await this.patientModel.deleteOne({ id });
-    if (res.deletedCount === 0) throw new NotFoundException('Patient non trouvé');
+    const res = await this.patientModel.findByIdAndDelete(id).exec();
+    if (!res) throw new NotFoundException('Patient non trouvé');
   }
 }

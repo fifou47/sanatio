@@ -1,5 +1,5 @@
-import { IsMongoId, IsDateString, IsNumber, Min, IsEnum } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsMongoId, IsDateString, IsNumber, Min, IsEnum, IsOptional, IsString, IsArray, ValidateIf } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ConsultationType } from '../schemas/consultation.schema';
 
 export class CreateConsultationDto {
@@ -17,4 +17,24 @@ export class CreateConsultationDto {
 
   @ApiProperty({ enum: ConsultationType })
   @IsEnum(ConsultationType) type: ConsultationType;
+
+  @ApiPropertyOptional({ description: 'Motif de la consultation' })
+  @IsOptional() @IsString()
+  reason?: string;
+
+  @ApiPropertyOptional({ description: 'Consultation de groupe' })
+  @IsOptional()
+  isGroup?: boolean;
+
+  @ApiPropertyOptional({ type: [String], description: 'IDs utilisateurs Auth supplémentaires' })
+  @IsOptional() @IsArray()
+  additionalUserIds?: string[];
+
+  @ApiPropertyOptional({ description: 'ID utilisateur Auth du patient' })
+  @IsOptional() @IsString()
+  patientUserId?: string;
+
+  @ApiPropertyOptional({ description: 'ID utilisateur Auth du médecin' })
+  @IsOptional() @IsString()
+  doctorUserId?: string;
 }

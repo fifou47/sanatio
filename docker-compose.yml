@@ -1,0 +1,169 @@
+version: '3.9'
+
+networks:
+  web:
+    driver: bridge
+
+volumes:
+  mongo_data:
+  redis_data:
+  consult_uploads:
+
+services:
+  traefik:
+    image: traefik:v3.0
+    command:
+      - --api.dashboard=true
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+    ports:
+      - "80:80"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - web
+
+  mongo:
+    image: mongo:6
+    ports:
+      - "27017:27017"
+    restart: unless-stopped
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - web
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    volumes:
+      - redis_data:/data
+    networks:
+      - web
+
+  sanatio_auth:
+    build:
+      context: ./sanatio-backend/sanatio_auth
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3443"   
+    environment:
+      - NODE_ENV=production
+      - PORT=3443
+      - MONGO_URI=mongodb://mongo:27017/sanatio_auth
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:19006,http://auth.localhost,http://consult.localhost,http://auth.viby.to,http://consult.viby.to
+      - EXPOSE_SWAGGER=true
+      - JWT_SECRET=dev-access-secret
+      - JWT_REFRESH_SECRET=dev-refresh-secret
+      - JWT_REFRESH_EXPIRES_IN=7d
+    depends_on:
+      - mongo
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.auth.rule=Host(`auth.localhost`) || Host(`auth.viby.to`)
+      - traefik.http.services.auth.loadbalancer.server.port=3443
+    networks:
+      - web
+
+  sanatio_consultation:
+    build:
+      context: ./sanatio-backend/sanatio_consultation
+      dockerfile: Dockerfile
+    ports:
+      - "4008:4008"
+    environment:
+      - NODE_ENV=production
+      - PORT=4008
+      - MONGO_URI=mongodb://mongo:27017/sanatio
+      - WS_ALLOWED_ORIGINS=http://localhost:19006,http://localhost:3000,http://consult.localhost,http://consult.viby.to
+      - PUBLIC_BASE_URL=http://consult.viby.to
+      - UPLOAD_DIR=/app/uploads
+      - MAX_FILE_SIZE=10485760
+      - ALLOWED_MIME_TYPES=image/png,image/jpeg,application/pdf
+      - MAX_WS_PAYLOAD=65536
+      - RATE_LIMIT=60
+      - RATE_LIMIT_TTL=60
+      - ICE_SERVERS=[{"urls":["stun:stun.l.google.com:19302"]}]
+    volumes:
+      - consult_uploads:/app/uploads
+    depends_on:
+      - mongo
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.consult.rule=Host(`consult.localhost`) || Host(`consult.viby.to`)
+      - traefik.http.services.consult.loadbalancer.server.port=4008
+    networks:
+      - web
+
+  sanatio_patient:
+    build:
+      context: ./sanatio-backend/sanatio_patient
+      dockerfile: Dockerfile
+    ports:
+      - "4000:4000"
+    environment:
+      - NODE_ENV=production
+      - PORT=4000
+      - MONGODB_URI=mongodb://mongo:27017/sanatio_patient
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:19006,http://patient.localhost,http://patient.viby.to
+      - RATE_LIMIT=60
+      - RATE_LIMIT_TTL=60
+    depends_on:
+      - mongo
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.patient.rule=Host(`patient.localhost`) || Host(`patient.viby.to`)
+      - traefik.http.services.patient.loadbalancer.server.port=4000
+    networks:
+      - web
+
+  sanatio_doctor:
+    build:
+      context: ./sanatio-backend/sanatio_doctor
+      dockerfile: Dockerfile
+    ports:
+      - "4004:4004"
+    environment:
+      - NODE_ENV=production
+      - PORT=4004
+      - MONGO_URI=mongodb://mongo:27017/sanatio_doctor
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:19006,http://doctor.localhost,http://doctor.viby.to
+      - RATE_LIMIT=60
+      - RATE_LIMIT_TTL=60
+    depends_on:
+      - mongo
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.doctor.rule=Host(`doctor.localhost`) || Host(`doctor.viby.to`)
+      - traefik.http.services.doctor.loadbalancer.server.port=4004
+    networks:
+      - web
+
+  sanatio_billing:
+    build:
+      context: ./sanatio-backend/sanatio_billing
+      dockerfile: Dockerfile
+    ports:
+      - "4005:3000" 
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - MONGODB_URI=mongodb://mongo:27017/sanatio_billing
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:19006,http://billing.localhost,http://billing.viby.to
+      - RATE_LIMIT=60
+      - RATE_LIMIT_TTL=60
+      - JWT_SECRET=dev-access-secret
+      - REDIS_URL=redis://redis:6379
+      - REDIS_RETRY_ATTEMPTS=5
+      - REDIS_RETRY_DELAY=3000
+    depends_on:
+      - mongo
+      - redis
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.billing.rule=Host(`billing.localhost`) || Host(`billing.viby.to`)
+      - traefik.http.services.billing.loadbalancer.server.port=3000
+    networks:
+      - web

@@ -11,12 +11,24 @@ import { RefreshTokenService } from './tokens/refresh-token.service';
 import { UserModule } from '../user/user.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { LocalStrategy } from './strategies/local.strategy';
+import { MongooseModule } from '@nestjs/mongoose';
+import { RefreshToken, RefreshTokenSchema } from './tokens/refresh-token.schema';
+import { PasswordResetToken, PasswordResetTokenSchema } from './schemas/password-reset-token.schema';
+import { PasswordResetService } from './password-reset.service';
+import { Session, SessionSchema } from './schemas/session.schema';
+import { SessionService } from './session.service';
 
 
 @Module({
   imports: [
     UserModule,
     PassportModule,
+    ConfigModule,
+    MongooseModule.forFeature([
+      { name: RefreshToken.name, schema: RefreshTokenSchema },
+      { name: PasswordResetToken.name, schema: PasswordResetTokenSchema },
+      { name: Session.name, schema: SessionSchema },
+    ]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -35,6 +47,8 @@ import { LocalStrategy } from './strategies/local.strategy';
     RolesGuard,
     AccessTokenService,
     RefreshTokenService,
+    PasswordResetService,
+    SessionService,
   ],
   exports: [AuthService],
 })

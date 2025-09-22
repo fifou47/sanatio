@@ -48,4 +48,23 @@ export class UserService {
     if (result.deletedCount === 0) throw new NotFoundException('User not found');
     return { message: 'User deleted successfully' };
   }
+
+  async setPassword(userId: string, password: string): Promise<void> {
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const updated = await this.userModel
+      .findOneAndUpdate({ id: userId }, { password: hashedPassword }, { new: true })
+      .exec();
+    if (!updated) {
+      throw new NotFoundException('User not found');
+    }
+  }
+
+  async setAutoLock(userId: string, enabled: boolean): Promise<void> {
+    const updated = await this.userModel
+      .findOneAndUpdate({ id: userId }, { autoLockEnabled: enabled }, { new: true })
+      .exec();
+    if (!updated) {
+      throw new NotFoundException('User not found');
+    }
+  }
 }

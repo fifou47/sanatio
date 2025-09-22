@@ -1,6 +1,19 @@
 # sanatio
 
+## Password reset flow
 
+- Backend (`sanatio-backend/sanatio_auth`)
+  - `POST /auth/password-reset/request` : génère un code à usage unique (validité 15 min) et l’envoie via le mailer stub (console).
+  - `POST /auth/password-reset/confirm` : confirme le code et remplace le mot de passe utilisateur (hashé avec bcrypt).
+- Mobile (`sanatio-frontend/sanatio`)
+  - `ForgotPasswordRequestScreen` : formulaire de demande, affichage succès/erreurs, messages hors-ligne, navigation vers la saisie du code.
+  - `ForgotPasswordConfirmScreen` : saisie OTP 6 chiffres, nouveaux mots de passe, renvoi du code avec timer, surface de confirmation.
+- Sécurité sessions
+  - Backend : `GET /auth/sessions`, `DELETE /auth/sessions/:sessionId`, `POST /auth/sessions/lock` pour lister/terminer/paramétrer le verrouillage automatique par utilisateur.
+  - Mobile : `ActiveSessionsScreen` (accessible via Paramètres) affiche les appareils connectés, permet de terminer une session (y compris la session courante) et de basculer le verrouillage automatique avec feedback hors-ligne.
+- Tests :
+  - Backend : `npm run test` dans `sanatio-backend/sanatio_auth` pour couvrir `PasswordResetService` et `AuthController`.
+  - Mobile : `npm run test` dans `sanatio-frontend/sanatio` pour les tests React Native (`ForgotPasswordRequestScreen`, `ForgotPasswordConfirmScreen`).
 
 ## Getting started
 

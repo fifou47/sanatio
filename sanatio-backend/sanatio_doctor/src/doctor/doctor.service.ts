@@ -31,6 +31,23 @@ export class DoctorService {
       userId: new Types.ObjectId(dto.userId),
       specialties: dto.specialties?.map(id => new Types.ObjectId(id)) || [],
       baseRate: dto.baseRate,
+      languages: dto.languages || [],
+      bio: dto.bio,
+      education: dto.education,
+      certifications: dto.certifications,
+      registrationNumber: dto.registrationNumber,
+      acceptsInsurance: dto.acceptsInsurance,
+      isTelemedicine: dto.isTelemedicine ?? true,
+      availabilityMode: dto.availabilityMode || 'BOTH',
+      clinicAddresses: (dto.clinicAddresses || []).map(a => ({
+        line1: a.line1,
+        line2: a.line2,
+        city: a.city,
+        region: a.region,
+        postalCode: a.postalCode,
+        country: a.country,
+        location: a.coordinates ? { type: 'Point', coordinates: a.coordinates } : undefined,
+      })),
     });
     return doc.save();
   }
@@ -52,6 +69,15 @@ export class DoctorService {
       {
         ...dto,
         specialties: dto.specialties?.map(id => new Types.ObjectId(id)),
+        clinicAddresses: dto.clinicAddresses?.map(a => ({
+          line1: a.line1,
+          line2: a.line2,
+          city: a.city,
+          region: a.region,
+          postalCode: a.postalCode,
+          country: a.country,
+          location: a.coordinates ? { type: 'Point', coordinates: a.coordinates } : undefined,
+        })),
       },
       { new: true },
     );
@@ -71,6 +97,29 @@ export class DoctorService {
     }
     if (dto.maxRate != null) {
       filter.baseRate = { $lte: dto.maxRate };
+    }
+    if (dto.languages && dto.languages.length) {
+      filter.languages = { $in: dto.languages };
+    }
+    if (dto.minRating != null) {
+      filter.ratingAverage = { $gte: dto.minRating };
+    }
+    if (dto.isTelemedicine != null) {
+      filter.isTelemedicine = dto.isTelemedicine;
+    }
+    if (dto.availabilityMode) {
+      filter.availabilityMode = dto.availabilityMode;
+    }
+
+    // Geo filter if provided
+    if (dto.lat != null && dto.lng != null && dto.maxDistanceKm != null) {
+      const max = Math.max(0, Number(dto.maxDistanceKm)) * 1000; // meters
+      filter['clinicAddresses.location'] = {
+        $near: {
+          $geometry: { type: 'Point', coordinates: [dto.lng, dto.lat] },
+          $maxDistance: max,
+        },
+      };
     }
     return this.doctorModel.find(filter).exec();
   }
