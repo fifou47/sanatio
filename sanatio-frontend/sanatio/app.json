@@ -1,8 +1,5 @@
 {
   "expo": {
-    "plugins": [
-      ["expo-secure-store"]
-    ],
     "scheme": "sanatio",
     "name": "sanatio",
     "slug": "sanatio",
@@ -16,6 +13,7 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
+
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
@@ -23,6 +21,7 @@
         "NSMicrophoneUsageDescription": "This app uses the microphone for calls."
       }
     },
+
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
@@ -33,25 +32,15 @@
       "permissions": ["INTERNET", "CAMERA", "RECORD_AUDIO"],
       "usesCleartextTraffic": true
     },
+
     "web": {
       "favicon": "./assets/favicon.png"
     },
+
     "plugins": [
-      [
-        "@livekit/react-native",
-        {
-          "android": {
-            "permissions": [
-              "android.permission.CAMERA",
-              "android.permission.RECORD_AUDIO"
-            ]
-          },
-          "ios": {
-            "cameraPermission": "L'application a besoin d'accéder à votre caméra pour les consultations vidéo.",
-            "microphonePermission": "L'application a besoin d'accéder à votre micro pour les consultations vidéo."
-          }
-        }
-      ]
+      "expo-secure-store",
+      "@livekit/react-native-expo-plugin",
+      "@config-plugins/react-native-webrtc"
     ]
   }
 }

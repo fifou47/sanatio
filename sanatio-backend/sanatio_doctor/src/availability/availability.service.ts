@@ -11,10 +11,11 @@ interface Consultation {
   endTime: string;
 }
 
-interface TimeSlot {
+export interface TimeSlot {
   start: Date;
   end: Date;
 }
+
 
 @Injectable()
 export class AvailabilityService {
