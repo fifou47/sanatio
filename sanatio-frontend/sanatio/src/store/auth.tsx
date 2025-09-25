@@ -4,7 +4,7 @@ import { api, loadTokens, saveTokens } from '../services/api/http';
 import { jwtDecode } from 'jwt-decode';
 import { toAppError } from '../services/api/errors';
 import { normalizePhone } from '../utils/phone';
-import { setStoredPatientId } from '../services/patient';
+import { ensurePatientProfile, getPatientByContact, getStoredAppPhone, setStoredPatientId } from '../services/patient';
 
 const SESSION_KEY = 'session_id';
 
@@ -87,27 +87,64 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })();
   }, []);
 
+
   const signIn = async (emailOrPhone: string, password: string) => {
-    try {
-      const resp = await api.auth.post('/auth/login', { emailOrPhone, password });
-      const a = resp.data?.accessToken as string | undefined;
-      const r = resp.data?.refreshToken as string | undefined;
-      const s = resp.data?.sessionId as string | undefined;
-      if (!a) {
-        throw toAppError(new Error('Réponse inattendue du serveur.')); // garant du flux
-      }
-      await saveTokens(a, r || null);
-      if (s) {
-        await SecureStore.setItemAsync(SESSION_KEY, s);
-        setSessionId(s);
-      }
-      setAccess(a);
-      setRefresh(r || null);
-      updateUserFromToken(a, s);
-    } catch (err) {
-      throw toAppError(err, 'Identifiants invalides ou connexion impossible.');
+  try {
+    const resp = await api.auth.post('/auth/login', { emailOrPhone, password });
+    const a = resp.data?.accessToken as string | undefined;
+    const r = resp.data?.refreshToken as string | undefined;
+    const s = resp.data?.sessionId as string | undefined;
+    if (!a) throw toAppError(new Error('Réponse inattendue du serveur.'));
+
+    await saveTokens(a, r || null);
+    if (s) {
+      await SecureStore.setItemAsync(SESSION_KEY, s);
+      setSessionId(s);
     }
-  };
+    setAccess(a);
+    setRefresh(r || null);
+    updateUserFromToken(a, s);
+
+    // 👉 Récupérer le patient existant par contact (email / téléphone local)
+    const payload: any = jwtDecode(a);
+    const email = payload?.email ?? null;
+    const userId = payload?.sub;
+    const localPhone = await getStoredAppPhone();
+
+    const found = await getPatientByContact({ email, phone: localPhone });
+    if (found && (found._id || found.id)) {
+      await setStoredPatientId(String(found._id || found.id));
+      return; // on a récupéré le dossier, c'est bon
+    }
+
+    // Pas trouvé ? On tente de créer/assurer le patient avec les infos du compte
+    let account: { name?: string | null; phone?: string | null } = {};
+    try {
+      const u = await api.auth.get(`/users/${userId}`);
+      account = u?.data ?? {};
+    } catch {
+      // non bloquant
+    }
+
+    const safeName =
+      (account?.name && String(account.name).trim()) ||
+      (email ? String(email).split('@')[0] : 'Patient');
+
+    const safePhone =
+      (localPhone && String(localPhone).trim()) ||
+      (account?.phone && String(account.phone).trim()) ||
+      '+000000000';
+
+    await ensurePatientProfile({
+      name: safeName,
+      email: (email || 'unknown@example.com').toLowerCase(),
+      phone: safePhone,
+    });
+  } catch (err) {
+    throw toAppError(err, 'Identifiants invalides ou connexion impossible.');
+  }
+};
+
 
   const signOut = async () => {
     try {
@@ -140,7 +177,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email: rest.email.trim(),
         phone: normalizePhone(rest.phone, dialCode),
       });
+
+
       await signIn(rest.email.trim(), rest.password);
+
+
     } catch (err) {
       throw toAppError(err, 'Impossible de créer le compte patient.');
     }

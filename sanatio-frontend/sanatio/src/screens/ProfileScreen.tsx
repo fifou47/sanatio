@@ -73,6 +73,7 @@ export default function ProfileScreen() {
         email: user.email,
         phone: normalizedPhone,
       });
+      console.log('[Profile] Created patient profile', created);
       const id = created?._id || created?.id || null;
       if (isMounted.current) setPatientId(id);
     } finally {
@@ -89,8 +90,10 @@ export default function ProfileScreen() {
     if (!user) return;
     setBusy(true);
     try {
+      console.log('[Profile] Refreshing account and patient ID');
       await reloadAccount();
       const stored = await getStoredPatientId();
+      console.log('[Profile] Refreshed patient ID', stored);
       if (isMounted.current) setPatientId(stored);
     } finally {
       if (isMounted.current) setBusy(false);
@@ -165,43 +168,12 @@ export default function ProfileScreen() {
               <Text style={styles.heroSubtitle}>{t('profile:heroSubtitle')}</Text>
             </View>
           </View>
-          <View style={styles.heroChips}>{roleChips}</View>
           {accountLoading ? (
             <View style={styles.heroLoader}>
               <ActivityIndicator color={Colors.white} size="small" />
               <Text style={styles.heroLoaderText}>{t('profile:loadingAccount')}</Text>
             </View>
           ) : null}
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>{t('profile:contactSection')}</Text>
-          <View style={styles.card}>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>{t('profile:email')}</Text>
-              <Text style={styles.infoValue}>{user?.email || t('profile:unknownValue')}</Text>
-            </View>
-            <View style={styles.divider} />
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>{t('profile:phone')}</Text>
-              <Text style={styles.infoValue}>{phoneValue}</Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>{t('profile:accountSection')}</Text>
-          <View style={styles.card}>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>{t('profile:id')}</Text>
-              <Text style={styles.infoValue}>{user?.id || t('profile:unknownValue')}</Text>
-            </View>
-            <View style={styles.divider} />
-            <View style={styles.rolesRow}>
-              <Text style={styles.infoLabel}>{t('profile:roles')}</Text>
-              <View style={styles.rolesWrap}>{cardRoleChips}</View>
-            </View>
-          </View>
         </View>
 
         <View style={styles.section}>
@@ -213,10 +185,7 @@ export default function ProfileScreen() {
                 <Text style={isPatientLinked ? styles.statusLinkedText : styles.statusMissingText}>{patientStatusLabel}</Text>
               </View>
             </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>{t('profile:patientId')}</Text>
-              <Text style={styles.infoValue}>{patientId || t('profile:patientMissing')}</Text>
-            </View>
+
             <Text style={styles.cardDescription}>{patientDescription}</Text>
             <View style={styles.cardActions}>
               <PrimaryButton
@@ -239,6 +208,24 @@ export default function ProfileScreen() {
             </View>
           </View>
         </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>{t('profile:contactSection')}</Text>
+          <View style={styles.card}>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>{t('profile:email')}</Text>
+              <Text style={styles.infoValue}>{user?.email || t('profile:unknownValue')}</Text>
+            </View>
+            <View style={styles.divider} />
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>{t('profile:phone')}</Text>
+              <Text style={styles.infoValue}>{phoneValue}</Text>
+            </View>
+          </View>
+        </View>
+
+
+
       </Screen>
     </>
   );

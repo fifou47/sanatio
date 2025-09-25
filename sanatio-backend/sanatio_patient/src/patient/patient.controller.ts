@@ -6,6 +6,7 @@ import {
   Delete,
   Param,
   Body,
+  Query,
 } from '@nestjs/common';
 import { PatientService } from './patient.service';
 import { CreatePatientDto } from './dto/create-patient.dto/create-patient.dto';
@@ -54,5 +55,17 @@ export class PatientController {
   @ApiParam({ name: 'id', description: 'ID du patient' })
   remove(@Param('id') id: string) {
     return this.service.remove(id);
+  }
+
+  @Get()
+  @ApiOperation({ summary: 'Lister ou rechercher des patients' })
+  find(
+    @Query('email') email?: string,
+    @Query('phone') phone?: string,
+  ) {
+    if (email || phone) {
+      return this.service.findByContact({ email, phone });
+    }
+    return this.service.findAll();
   }
 }

@@ -1,30 +1,31 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { HydratedDocument } from 'mongoose';
 
-@Schema({ timestamps: true })
+@Schema({
+  timestamps: true,     // gère createdAt / updatedAt automatiquement
+  versionKey: false,    // pas de __v
+})
 export class Session {
-  @Prop({ required: true, unique: true })
+  @Prop({ type: String, required: true, unique: true, trim: true })
   sessionId!: string;
 
-  @Prop({ required: true })
+  // si tes users sont en ObjectId, tu pourras remplacer par Types.ObjectId + ref
+  @Prop({ type: String, required: true, trim: true })
   userId!: string;
 
-  @Prop({ default: null })
-  userAgent!: string | null;
+  @Prop({ type: String, default: null, trim: true })
+  userAgent?: string | null;
 
-  @Prop({ default: null })
+  @Prop({ type: String, default: null, trim: true })
   ip!: string | null;
 
-  @Prop({ default: Date.now })
+  @Prop({ type: Date, default: Date.now })
   lastSeen!: Date;
-
-  @Prop({ default: Date.now })
-  createdAt!: Date;
-
-  @Prop({ default: Date.now })
-  updatedAt!: Date;
 }
 
-export type SessionDocument = Session & Document;
+export type SessionDocument = HydratedDocument<Session>;
 export const SessionSchema = SchemaFactory.createForClass(Session);
-SessionSchema.index({ userId: 1, sessionId: 1 }, { unique: true });
+
+// Index utiles et simples
+SessionSchema.index({ sessionId: 1 }, { unique: true });
+SessionSchema.index({ userId: 1 });

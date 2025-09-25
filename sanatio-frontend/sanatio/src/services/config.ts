@@ -18,6 +18,7 @@ export const Config = {
   PATIENT_URL: GATEWAY ? join(GATEWAY, '') : env('EXPO_PUBLIC_PATIENT_URL', 'http://patient.localhost'),
   DOCTOR_URL: GATEWAY ? join(GATEWAY, '') : env('EXPO_PUBLIC_DOCTOR_URL', 'http://doctor.localhost'),
   BILLING_URL: GATEWAY ? join(GATEWAY, '') : env('EXPO_PUBLIC_BILLING_URL', 'http://billing.localhost'),
+  CONSULTATION_URL: GATEWAY ? join(GATEWAY, '') : env('EXPO_PUBLIC_CONSULTATION_URL', 'http://consult.localhost'),
   WS_URL: env('EXPO_PUBLIC_WS_URL', 'ws://consult.localhost'),
   ICE_SERVERS(): IceServer[] {
     try {
@@ -38,6 +39,7 @@ export function logConfig() {
     PATIENT_URL: Config.PATIENT_URL,
     DOCTOR_URL: Config.DOCTOR_URL,
     BILLING_URL: Config.BILLING_URL,
+    CONSULTATION_URL: Config.CONSULTATION_URL,
     WS_URL: Config.WS_URL,
   });
 }

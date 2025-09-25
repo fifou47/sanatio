@@ -31,7 +31,6 @@ export default function Screen({
     flexGrow: 1,
     paddingHorizontal: padding,
     paddingTop: padding,
-    paddingBottom: extraBottom,
   };
 
   if (scroll) {
@@ -54,7 +53,6 @@ export default function Screen({
         {
           paddingHorizontal: padding,
           paddingTop: padding,
-          paddingBottom: extraBottom,
         },
         style,
       ]}

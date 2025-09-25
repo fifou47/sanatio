@@ -1,8 +1,9 @@
+// MainTabs.tsx
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import HomeScreen from '../screens/HomeScreen';
 import ChatScreen from '../screens/ChatScreen';
-import ConsultationsScreen from '../screens/ConsultationsScreen';
+// ⬇️ remplace l'ancien import écran par le stack
 import BillingScreen from '../screens/BillingScreen';
 import SettingsStack, { SettingsStackParamList } from './SettingsStack';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -15,11 +16,13 @@ import { useTheme } from 'react-native-paper';
 import { Colors, Shadows } from '../theme/theme';
 import { Text } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import ConsultationStack, { ConsultationStackParamList } from './ConsultationsStack';
 
 export type MainTabsParamList = {
   Home: undefined;
   Chat: undefined;
-  Consultations: undefined;
+  // ⬇️ l’onglet pointe maintenant sur le stack
+  Consultations: NavigatorScreenParams<ConsultationStackParamList>;
   Billing: undefined;
   Settings: NavigatorScreenParams<SettingsStackParamList>;
   Profile: undefined;
@@ -33,6 +36,7 @@ export default function MainTabs() {
   const theme = useTheme();
   const { t } = useTranslation();
   const isDoctor = (user?.roles || []).includes('doctor');
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -40,10 +44,6 @@ export default function MainTabs() {
         tabBarStyle: {
           backgroundColor: theme.colors.surface,
           height: 65,
-          borderRadius: 0,
-          marginHorizontal: 0,
-          marginBottom: 0,
-          position: 'relative',
           borderTopWidth: 0,
           paddingBottom: 8,
           paddingTop: 8,
@@ -89,9 +89,10 @@ export default function MainTabs() {
           },
         }}
       />
+      {/* ⬇️ ICI on met le STACK au lieu du screen */}
       <Tab.Screen
         name="Consultations"
-        component={ConsultationsScreen}
+        component={ConsultationStack}
         listeners={{
           tabPress: (e) => {
             if (!accessToken) {

@@ -32,7 +32,7 @@ const Stack = createNativeStackNavigator<RootParamList>();
 
 const prefix = Linking.createURL('/');
 
-const linking: LinkingOptions<any> = {
+const linking: LinkingOptions<RootParamList> = {
   prefixes: [prefix],
   config: {
     screens: {
@@ -40,7 +40,13 @@ const linking: LinkingOptions<any> = {
         screens: {
           Home: 'home',
           Chat: 'chat',
-          Consultations: 'consultations',
+          // ⬇️ on décrit le stack imbriqué
+          Consultations: {
+            screens: {
+              ConsultationsHome: 'consultations',
+              ScheduleConsultation: 'consultations/schedule',
+            },
+          },
           Billing: 'billing',
           Settings: 'settings',
           Profile: 'profile',

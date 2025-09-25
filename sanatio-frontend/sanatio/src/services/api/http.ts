@@ -4,8 +4,10 @@ import { Config } from '../config';
 
 type Tokens = { accessToken: string | null; refreshToken: string | null };
 
-const ACCESS_KEY = 'access_token';
-const REFRESH_KEY = 'refresh_token';
+// http.ts
+export const ACCESS_KEY = 'access_token';
+export const REFRESH_KEY = 'refresh_token';
+
 
 let tokens: Tokens = { accessToken: null, refreshToken: null };
 let isRefreshing = false;
@@ -107,4 +109,5 @@ export const api = {
   patient: createClient(Config.PATIENT_URL),
   doctor: createClient(Config.DOCTOR_URL),
   billing: createClient(Config.BILLING_URL),
+  consult: createClient(Config.CONSULTATION_URL),
 };

@@ -41,6 +41,25 @@ const resources = {
         guest: 'Continue as guest',
         genericError: 'Unable to sign in.',
       },
+      consultations: {
+        titlePatient: 'Consultations',
+        titleDoctor: 'Agenda',
+        emptyGuestTitle: 'Sign in required',
+        emptyGuestDescription: 'Consultations are available after authentication.',
+        emptyPatientTitle: 'No consultation scheduled',
+        emptyPatientDescription: 'Book your next medical consultation in a few taps.',
+        emptyDoctorTitle: 'Your agenda is empty',
+        emptyDoctorDescription: 'Publish your availability to receive your first appointments.',
+        cta: 'Sign in',
+
+        // ✅ Ajouts
+        urgentReason: 'Urgent',
+        urgentCreated: 'Urgent consultation created',
+        urgentButton: 'Urgent',
+        scheduleButton: 'Schedule',
+        join: 'Join',
+        noConsultations: 'No consultations on this date.',
+      },
       signup: {
         title: 'Create your patient space',
         subtitle: 'Schedule your consultations and keep your medical documents in one place.',
@@ -454,6 +473,26 @@ const resources = {
         guest: 'Continuer en invité',
         genericError: 'Impossible de se connecter.',
       },
+      consultations: {
+        titlePatient: 'Consultations',
+        titleDoctor: 'Agenda',
+        emptyGuestTitle: 'Connexion requise',
+        emptyGuestDescription: 'Les consultations sont disponibles après authentification.',
+        emptyPatientTitle: 'Pas de consultation prévue',
+        emptyPatientDescription: 'Réservez votre prochaine consultation médicale en quelques taps.',
+        emptyDoctorTitle: 'Votre agenda est encore vide',
+        emptyDoctorDescription: 'Publiez vos disponibilités pour recevoir vos premiers rendez-vous.',
+        cta: 'Se connecter',
+
+        // ✅ Ajouts
+        urgentReason: 'Urgence',
+        urgentCreated: 'Consultation urgente créée',
+        urgentButton: 'Urgent',
+        scheduleButton: 'Planifier',
+        join: 'Rejoindre',
+        noConsultations: 'Aucune consultation ce jour.',
+      },
+
       signup: {
         title: 'Créer votre espace patient',
         subtitle: 'Planifiez vos consultations et gardez vos documents médicaux au même endroit.',

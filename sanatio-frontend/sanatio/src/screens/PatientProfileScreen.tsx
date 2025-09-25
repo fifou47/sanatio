@@ -5,15 +5,11 @@ import {
   ScrollView,
   StyleSheet,
   View,
-  Pressable,
   Platform,
 } from 'react-native';
-import * as DocumentPicker from 'expo-document-picker';
 import {
   Text,
   Snackbar,
-  Portal,
-  Dialog,
   Button,
   TextInput,
   ActivityIndicator,
@@ -27,7 +23,6 @@ import { RouteProp, useFocusEffect, useNavigation, useRoute } from '@react-navig
 import Screen from '../components/Screen';
 import HeaderBar from '../components/HeaderBar';
 import Avatar from '../components/Avatar';
-import PrimaryButton from '../components/PrimaryButton';
 import { useTranslation } from 'react-i18next';
 import { api } from '../services/api/http';
 import { toAppError } from '../services/api/errors';
@@ -35,6 +30,16 @@ import { useAuth } from '../store/auth';
 import { getStoredPatientId } from '../services/patient';
 import { RootParamList } from '../navigation/RootNavigator';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+
+/**
+ * Patient profile screen.
+ *
+ * This component displays a patient's information in a series of cards.  Each section
+ * (personal, contact, emergency, medical) can be edited directly within the card
+ * without using a modal.  When the user taps an edit button, the corresponding card
+ * expands to reveal a form.  Upon saving, the updated values are sent to the API
+ * and the local state is refreshed.
+ */
 
 type PatientProfileRoute = RouteProp<RootParamList, 'PatientProfile'>;
 type Navigation = NativeStackNavigationProp<RootParamList>;
@@ -46,6 +51,7 @@ type PatientDocument = {
   name?: string;
 };
 
+// Patient DTO representing the structure returned from the backend
 type PatientDto = {
   _id: string;
   name: string;
@@ -77,8 +83,11 @@ type PatientDto = {
   nationality?: string;
 };
 
+// Sections that can be edited in-line within their card
 type EditableSection = 'personal' | 'medical' | 'contact' | 'emergency';
 
+// Colour palette used throughout the screen.  Feel free to adjust these values to
+// refine the look and feel while keeping the same primary hue.
 const Colors = {
   primary: '#2B66F6',
   background: '#F4F6FB',
@@ -91,6 +100,7 @@ const Colors = {
   error: '#EF4444',
 };
 
+// Spacing scale for consistent margins and paddings
 const Spacing = {
   xs: 8,
   sm: 12,
@@ -99,6 +109,7 @@ const Spacing = {
   xl: 28,
 };
 
+// Radius scale for rounded corners
 const Radius = {
   sm: 12,
   md: 16,
@@ -111,17 +122,22 @@ export default function PatientProfileScreen() {
   const { t } = useTranslation();
   const { user } = useAuth();
 
+  // Patient data and identifiers
   const [patient, setPatient] = useState<PatientDto | null>(null);
   const [patientId, setPatientId] = useState<string | null>(route.params?.patientId ?? null);
+
+  // Loading and error states
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [snackbar, setSnackbar] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
+
+  // Editing state: which section is being edited and form values
   const [savingSection, setSavingSection] = useState<EditableSection | null>(null);
   const [editingSection, setEditingSection] = useState<EditableSection | null>(null);
   const [formValues, setFormValues] = useState<Record<string, any>>({});
 
+  // Refs to track latest requests and loaded patient ID
   const requestIdRef = useRef(0);
   const patientRef = useRef<PatientDto | null>(null);
   const loadedPatientIdRef = useRef<string | null>(null);
@@ -146,6 +162,7 @@ export default function PatientProfileScreen() {
     [formValues],
   );
 
+  // When the user changes (logged out), reset all state
   useEffect(() => {
     if (!user) {
       requestIdRef.current += 1;
@@ -155,24 +172,20 @@ export default function PatientProfileScreen() {
       setRefreshing(false);
       setError(null);
       setSnackbar(null);
-      setUploading(false);
       setSavingSection(null);
       closeEditDialog();
     }
   }, [user, closeEditDialog, setPatientState]);
 
-  const canManageDocuments = useMemo(() => {
-    const roles = user?.roles ?? [];
-    const allowed = ['doctor', 'practitioner', 'admin', 'staff', 'patient'];
-    return roles.some((role) => allowed.includes(role));
-  }, [user?.roles]);
-
+  // Determine if the current user can edit the profile.  We include both
+  // human-readable roles and the raw MongoDB ObjectId for the patient role.
   const canEditProfile = useMemo(() => {
     const roles = user?.roles ?? [];
-    const allowed = ['doctor', 'practitioner', 'admin', 'staff', 'patient'];
+    const allowed = ['doctor', 'practitioner', 'admin', 'staff', 'patient', '68d175acc9b49865d52981e1'];
     return roles.some((role) => allowed.includes(role));
   }, [user?.roles]);
 
+  // Fetch the patient record from the server
   const fetchPatient = useCallback(
     async (targetId: string, options?: { skipLoading?: boolean }) => {
       const { skipLoading = false } = options ?? {};
@@ -207,6 +220,7 @@ export default function PatientProfileScreen() {
     [setPatientState, t],
   );
 
+  // Load the patient when the screen gains focus
   useFocusEffect(
     useCallback(() => {
       let isActive = true;
@@ -239,11 +253,13 @@ export default function PatientProfileScreen() {
     }, [fetchPatient, route.params?.patientId, setPatientState, t]),
   );
 
+  // Fetch patient when patientId changes
   useEffect(() => {
     if (!patientId) return;
     fetchPatient(patientId);
   }, [fetchPatient, patientId]);
 
+  // Pull to refresh
   const handleRefresh = () => {
     if (!patientId) return;
     setRefreshing(true);
@@ -252,6 +268,7 @@ export default function PatientProfileScreen() {
     fetchPatient(patientId, { skipLoading: true });
   };
 
+  // Prepopulate form values and open editing section
   const openEditDialog = useCallback(
     (section: EditableSection) => {
       if (!patient || !canEditProfile) return;
@@ -296,6 +313,7 @@ export default function PatientProfileScreen() {
     [canEditProfile, patient],
   );
 
+  // Save the current editing section
   const handleSaveSection = async () => {
     if (!patientId || !patient || !editingSection) return;
     const section = editingSection;
@@ -397,47 +415,7 @@ export default function PatientProfileScreen() {
     }
   };
 
-  const handleUploadDocument = async () => {
-    if (!canManageDocuments || !patientId || !patient) return;
-    const permission = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true });
-    if (permission.canceled || !permission.assets?.length) return;
-
-    const asset = permission.assets[0];
-    const fileUri = asset.uri;
-    const fileName = asset.name ?? `document-${Date.now()}`;
-    const mimeType = asset.mimeType ?? 'application/octet-stream';
-
-    const formData = new FormData();
-    formData.append('file', {
-      uri: fileUri,
-      name: fileName,
-      type: mimeType,
-    } as any);
-
-    setUploading(true);
-    try {
-      const uploadResp = await api.patient.post('/files/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      const meta = uploadResp.data as { url: string; name: string; mime: string };
-      const documents = [...(patient.documents ?? []), {
-        url: meta.url,
-        type: meta.mime,
-        name: meta.name ?? fileName,
-        dateUpload: new Date().toISOString(),
-      }];
-      await api.patient.patch(`/patients/${patientId}`, { documents });
-      setSnackbar(t('patientProfile:uploadSuccess'));
-      fetchPatient(patientId, { skipLoading: true });
-    } catch (err) {
-      const appError = toAppError(err, t('patientProfile:uploadError'));
-      const message = appError.code === 'ERR_NETWORK' ? t('common:offline') : appError.message;
-      setSnackbar(message);
-    } finally {
-      setUploading(false);
-    }
-  };
-
+  // Compute the patient's age display once per render
   const ageDisplay = useMemo(() => {
     if (!patient?.dateOfBirth) return null;
     const birthDate = new Date(patient.dateOfBirth);
@@ -449,6 +427,10 @@ export default function PatientProfileScreen() {
     return t('patientProfile:ageYears', { count: age });
   }, [patient?.dateOfBirth, t]);
 
+  /**
+   * Helper to render a label/value row within a card.  Uses flexbox to layout
+   * two columns on larger screens and stacks on smaller devices automatically.
+   */
   const renderInfoRow = (label: string, value: string) => (
     <View key={label} style={styles.infoRow}>
       <Text style={styles.infoLabel}>{label}</Text>
@@ -458,6 +440,9 @@ export default function PatientProfileScreen() {
     </View>
   );
 
+  /**
+   * Helper to render a list of chips for languages, allergies, etc.
+   */
   const renderChipList = (title: string, items?: string[]) => (
     <View style={styles.sectionBlock}>
       <Text style={styles.sectionTitle}>{title}</Text>
@@ -475,6 +460,9 @@ export default function PatientProfileScreen() {
     </View>
   );
 
+  /**
+   * Helper to render a bulleted list with icons for medical history and treatments.
+   */
   const renderBulletList = (
     title: string,
     items?: string[],
@@ -497,470 +485,494 @@ export default function PatientProfileScreen() {
     </View>
   );
 
-  const renderHeroCard = () => (
-    <Card style={styles.card}>
-      <Card.Content>
-        <View style={styles.heroRow}>
-          <Avatar name={patient?.name} uri={patient?.avatarUrl} size={72} />
-          <View style={styles.heroInfo}>
-            <Text style={styles.heroName} numberOfLines={2}>
-              {patient?.name || t('patientProfile:unknownPatient')}
-            </Text>
-            {patient?.email ? <Text style={styles.heroSubtitle}>{patient.email}</Text> : null}
-            {patient?.phone ? <Text style={styles.heroSubtitle}>{patient.phone}</Text> : null}
-          </View>
-        </View>
-        <Divider style={styles.divider} />
-        <View style={styles.heroStatsRow}>
-          {renderInfoRow(t('patientProfile:birthDate'), ageDisplay || t('patientProfile:notProvided'))}
-          {renderInfoRow(t('patientProfile:gender'), patient?.gender || '')}
-          {renderInfoRow(t('patientProfile:nationality'), patient?.nationality || '')}
-        </View>
-      </Card.Content>
-      {canEditProfile ? (
-        <Card.Actions style={styles.cardActions}>
-          <Button mode="contained" icon="pencil" onPress={() => openEditDialog('personal')}>
-            {t('patientProfile:editIdentityAction')}
-          </Button>
-        </Card.Actions>
-      ) : null}
-    </Card>
-  );
-
-  const renderOverviewCard = () => (
-    <Card style={styles.card}>
-      <Card.Title
-        title={t('patientProfile:overviewSection')}
-        titleNumberOfLines={2}
-        titleStyle={styles.cardTitle}
-        left={(props) => <Icon {...props} name="account-box" color={Colors.primary} size={26} />}
-      />
-      <Card.Content>
-        <View style={styles.infoGrid}>
-          {renderInfoRow(t('patientProfile:email'), patient?.email || '')}
-          {renderInfoRow(t('patientProfile:phone'), patient?.phone || '')}
-        </View>
-        <Divider style={styles.divider} />
-        {renderChipList(t('patientProfile:languages'), patient?.languages)}
-      </Card.Content>
-    </Card>
-  );
-
-  const renderContactCard = () => (
-    <Card style={styles.card}>
-      <Card.Title
-        title={t('patientProfile:contactsSection')}
-        titleStyle={styles.cardTitle}
-        left={(props) => <Icon {...props} name="map-marker-radius" color={Colors.primary} size={26} />}
-      />
-      <Card.Content>
-        <Text style={styles.infoLabel}>{t('patientProfile:address')}</Text>
-        <Text style={styles.infoValue}>
-          {[
-            patient?.address?.line1,
-            patient?.address?.line2,
-            patient?.address?.city,
-            patient?.address?.postalCode,
-            patient?.address?.country,
-          ]
-            .filter(Boolean)
-            .join(', ') || t('patientProfile:notProvided')}
-        </Text>
-      </Card.Content>
-      {canEditProfile ? (
-        <Card.Actions style={styles.cardActions}>
-          <Button mode="outlined" onPress={() => openEditDialog('contact')} icon="map-marker">
-            {t('patientProfile:editContactTitle')}
-          </Button>
-        </Card.Actions>
-      ) : null}
-    </Card>
-  );
-
-  const renderEmergencyCard = () => (
-    <Card style={styles.card}>
-      <Card.Title
-        title={t('patientProfile:emergencyContact')}
-        titleStyle={styles.cardTitle}
-        left={(props) => <Icon {...props} name="phone-alert" color={Colors.primary} size={26} />}
-      />
-      <Card.Content>
-        {patient?.emergencyContact ? (
-          <View style={styles.infoGrid}>
-            {renderInfoRow(t('patientProfile:emergencyName'), patient.emergencyContact.name || '')}
-            {renderInfoRow(t('patientProfile:emergencyRelation'), patient.emergencyContact.relation || '')}
-            {renderInfoRow(t('patientProfile:emergencyPhone'), patient.emergencyContact.phone || '')}
-          </View>
-        ) : (
-          <Text style={styles.emptyText}>{t('patientProfile:notProvided')}</Text>
-        )}
-      </Card.Content>
-      {canEditProfile ? (
-        <Card.Actions style={styles.cardActions}>
-          <Button mode="outlined" onPress={() => openEditDialog('emergency')} icon="phone">
-            {t('patientProfile:editEmergencyTitle')}
-          </Button>
-        </Card.Actions>
-      ) : null}
-    </Card>
-  );
-
-  const renderMedicalCard = () => (
-    <Card style={styles.card}>
-      <Card.Title
-        title={t('patientProfile:medicalInfo')}
-        titleStyle={styles.cardTitle}
-        left={(props) => <Icon {...props} name="medical-bag" color={Colors.primary} size={26} />}
-      />
-      <Card.Content>
-        <View style={styles.infoGrid}>
-          {renderInfoRow(t('patientProfile:bloodGroup'), patient?.bloodGroup || '')}
-          {renderInfoRow(t('patientProfile:insurance'), patient?.insuranceNumber || '')}
-        </View>
-        <Divider style={styles.divider} />
-        {renderChipList(t('patientProfile:allergies'), patient?.allergies)}
-        <Divider style={styles.divider} />
-        {renderBulletList(t('patientProfile:medicalHistory'), patient?.medicalHistory)}
-        <Divider style={styles.divider} />
-        {renderBulletList(t('patientProfile:currentTreatments'), patient?.currentTreatments, 'pill')}
-      </Card.Content>
-      {canEditProfile ? (
-        <Card.Actions style={styles.cardActions}>
-          <Button mode="outlined" onPress={() => openEditDialog('medical')} icon="pencil">
-            {t('patientProfile:editMedicalTitle')}
-          </Button>
-        </Card.Actions>
-      ) : null}
-    </Card>
-  );
-
-  const renderDocumentsCard = () => (
-    <Card style={styles.card}>
-      <Card.Title
-        title={t('patientProfile:documentsSection')}
-        titleStyle={styles.cardTitle}
-        left={(props) => <Icon {...props} name="file-document" color={Colors.primary} size={26} />}
-      />
-      <Card.Content>
-        {canManageDocuments ? (
-          <PrimaryButton
-            loading={uploading}
-            onPress={handleUploadDocument}
-            style={styles.uploadButton}
-            icon="upload"
-          >
-            {t('patientProfile:uploadButton')}
-          </PrimaryButton>
-        ) : (
-          <Text style={styles.emptyText}>{t('patientProfile:documentsReadOnly')}</Text>
-        )}
-        <Divider style={styles.divider} />
-        {patient?.documents && patient.documents.length ? (
-          patient.documents.map((doc, index) => (
-            <Pressable
-              key={`${doc.url}-${index}`}
-              style={styles.documentRow}
-              onPress={() => doc.url && Linking.openURL(doc.url)}
-            >
-              <Icon name="file-document-outline" size={26} color={Colors.primary} />
-              <View style={styles.documentInfo}>
-                <Text style={styles.documentName}>{doc.name || t('patientProfile:document')}</Text>
-                <Text style={styles.documentMeta}>
-                  {doc.dateUpload
-                    ? new Date(doc.dateUpload).toLocaleDateString()
-                    : t('patientProfile:notProvided')}
-                </Text>
-              </View>
-              <Icon name="chevron-right" size={22} color={Colors.textSecondary} />
-            </Pressable>
-          ))
-        ) : (
-          <Text style={styles.emptyText}>{t('patientProfile:noDocuments')}</Text>
-        )}
-      </Card.Content>
-    </Card>
-  );
-
-  const getDialogTitle = () => {
-    switch (editingSection) {
-      case 'personal':
-        return t('patientProfile:editPersonalTitle');
-      case 'medical':
-        return t('patientProfile:editMedicalTitle');
-      case 'contact':
-        return t('patientProfile:editContactTitle');
-      case 'emergency':
-        return t('patientProfile:editEmergencyTitle');
-      default:
-        return '';
-    }
-  };
-
-  const renderEditDialog = () => {
-    if (!editingSection) return null;
-
-    return (
-      <Portal>
-        <Dialog visible onDismiss={closeEditDialog} style={styles.dialog}>
-          <Dialog.Title>{getDialogTitle()}</Dialog.Title>
-          <Dialog.ScrollArea>
-            <ScrollView contentContainerStyle={styles.dialogContent}>
-              {editingSection === 'personal' && (
-                <>
-                  <TextInput
-                    label={t('patientProfile:name')}
-                    value={getFormValue('name')}
-                    onChangeText={(text) => updateFormValue('name', text)}
-                    mode="outlined"
-                    autoCapitalize="words"
-                    style={styles.input}
-                  />
-                  <TextInput
-                    label={t('patientProfile:email')}
-                    value={getFormValue('email')}
-                    onChangeText={(text) => updateFormValue('email', text)}
-                    mode="outlined"
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    style={styles.input}
-                  />
-                  <TextInput
-                    label={t('patientProfile:phone')}
-                    value={getFormValue('phone')}
-                    onChangeText={(text) => updateFormValue('phone', text)}
-                    mode="outlined"
-                    keyboardType={Platform.OS === 'ios' ? 'numbers-and-punctuation' : 'phone-pad'}
-                    style={styles.input}
-                  />
-                  <TextInput
-                    label={t('patientProfile:birthDatePlaceholder')}
-                    value={getFormValue('dateOfBirth')}
-                    onChangeText={(text) => updateFormValue('dateOfBirth', text)}
-                    mode="outlined"
-                    placeholder="YYYY-MM-DD"
-                    style={styles.input}
-                  />
-                  <TextInput
-                    label={t('patientProfile:gender')}
-                    value={getFormValue('gender')}
-                    onChangeText={(text) => updateFormValue('gender', text)}
-                    mode="outlined"
-                    style={styles.input}
-                  />
-                  <TextInput
-                    label={t('patientProfile:nationality')}
-                    value={getFormValue('nationality')}
-                    onChangeText={(text) => updateFormValue('nationality', text)}
-                    mode="outlined"
-                    style={styles.input}
-                  />
-                  <TextInput
-                    label={t('patientProfile:languages')}
-                    value={getFormValue('languages')}
-                    onChangeText={(text) => updateFormValue('languages', text)}
-                    mode="outlined"
-                    placeholder={t('patientProfile:languagesPlaceholderHint')}
-                    style={styles.input}
-                  />
-                </>
-              )}
-
-              {editingSection === 'medical' && (
-                <>
-                  <TextInput
-                    label={t('patientProfile:bloodGroup')}
-                    value={getFormValue('bloodGroup')}
-                    onChangeText={(text) => updateFormValue('bloodGroup', text)}
-                    mode="outlined"
-                    style={styles.input}
-                  />
-                  <TextInput
-                    label={t('patientProfile:insurance')}
-                    value={getFormValue('insuranceNumber')}
-                    onChangeText={(text) => updateFormValue('insuranceNumber', text)}
-                    mode="outlined"
-                    style={styles.input}
-                  />
-                  <TextInput
-                    label={t('patientProfile:allergies')}
-                    value={getFormValue('allergies')}
-                    onChangeText={(text) => updateFormValue('allergies', text)}
-                    mode="outlined"
-                    multiline
-                    numberOfLines={2}
-                    placeholder={t('patientProfile:languagesPlaceholderHint')}
-                    style={styles.input}
-                  />
-                  <TextInput
-                    label={t('patientProfile:medicalHistory')}
-                    value={getFormValue('medicalHistory')}
-                    onChangeText={(text) => updateFormValue('medicalHistory', text)}
-                    mode="outlined"
-                    multiline
-                    numberOfLines={4}
-                    placeholder="Un élément par ligne"
-                    style={styles.input}
-                  />
-                  <TextInput
-                    label={t('patientProfile:currentTreatments')}
-                    value={getFormValue('currentTreatments')}
-                    onChangeText={(text) => updateFormValue('currentTreatments', text)}
-                    mode="outlined"
-                    multiline
-                    numberOfLines={4}
-                    placeholder="Un traitement par ligne"
-                    style={styles.input}
-                  />
-                </>
-              )}
-
-              {editingSection === 'contact' && (
-                <>
-                  <TextInput
-                    label={t('patientProfile:addressLine1')}
-                    value={getFormValue('addressLine1')}
-                    onChangeText={(text) => updateFormValue('addressLine1', text)}
-                    mode="outlined"
-                    style={styles.input}
-                  />
-                  <TextInput
-                    label={t('patientProfile:addressLine2')}
-                    value={getFormValue('addressLine2')}
-                    onChangeText={(text) => updateFormValue('addressLine2', text)}
-                    mode="outlined"
-                    style={styles.input}
-                  />
-                  <TextInput
-                    label={t('patientProfile:city')}
-                    value={getFormValue('addressCity')}
-                    onChangeText={(text) => updateFormValue('addressCity', text)}
-                    mode="outlined"
-                    style={styles.input}
-                  />
-                  <TextInput
-                    label={t('patientProfile:region')}
-                    value={getFormValue('addressRegion')}
-                    onChangeText={(text) => updateFormValue('addressRegion', text)}
-                    mode="outlined"
-                    style={styles.input}
-                  />
-                  <TextInput
-                    label={t('patientProfile:postalCode')}
-                    value={getFormValue('addressPostalCode')}
-                    onChangeText={(text) => updateFormValue('addressPostalCode', text)}
-                    mode="outlined"
-                    style={styles.input}
-                  />
-                  <TextInput
-                    label={t('patientProfile:country')}
-                    value={getFormValue('addressCountry')}
-                    onChangeText={(text) => updateFormValue('addressCountry', text)}
-                    mode="outlined"
-                    style={styles.input}
-                  />
-                </>
-              )}
-
-              {editingSection === 'emergency' && (
-                <>
-                  <TextInput
-                    label={t('patientProfile:emergencyName')}
-                    value={getFormValue('emergencyName')}
-                    onChangeText={(text) => updateFormValue('emergencyName', text)}
-                    mode="outlined"
-                    style={styles.input}
-                  />
-                  <TextInput
-                    label={t('patientProfile:emergencyRelation')}
-                    value={getFormValue('emergencyRelation')}
-                    onChangeText={(text) => updateFormValue('emergencyRelation', text)}
-                    mode="outlined"
-                    style={styles.input}
-                  />
-                  <TextInput
-                    label={t('patientProfile:emergencyPhone')}
-                    value={getFormValue('emergencyPhone')}
-                    onChangeText={(text) => updateFormValue('emergencyPhone', text)}
-                    mode="outlined"
-                    keyboardType="phone-pad"
-                    style={styles.input}
-                  />
-                </>
-              )}
-            </ScrollView>
-          </Dialog.ScrollArea>
-          <Dialog.Actions>
+  /**
+   * Card displaying personal (identity) information.  In editing mode, it shows
+   * form inputs for each personal field; otherwise it shows read-only data.
+   */
+  const renderPersonalCard = () => {
+    if (!patient) return null;
+    if (editingSection === 'personal') {
+      return (
+        <Card style={styles.card}>
+          <Card.Title
+            title={t('patientProfile:editPersonalTitle')}
+            titleStyle={styles.cardTitle}
+            left={(props) => <Icon {...props} name="account-edit" color={Colors.primary} size={26} />}
+          />
+          <Card.Content>
+            <TextInput
+              label={t('patientProfile:name')}
+              value={getFormValue('name')}
+              onChangeText={(text) => updateFormValue('name', text)}
+              mode="outlined"
+              autoCapitalize="words"
+              style={styles.input}
+              theme={{ colors: { primary: Colors.primary, outline: Colors.border } }}
+            />
+            <TextInput
+              label={t('patientProfile:email')}
+              value={getFormValue('email')}
+              onChangeText={(text) => updateFormValue('email', text)}
+              mode="outlined"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              style={styles.input}
+              theme={{ colors: { primary: Colors.primary, outline: Colors.border } }}
+            />
+            <TextInput
+              label={t('patientProfile:phone')}
+              value={getFormValue('phone')}
+              onChangeText={(text) => updateFormValue('phone', text)}
+              mode="outlined"
+              keyboardType={Platform.OS === 'ios' ? 'numbers-and-punctuation' : 'phone-pad'}
+              style={styles.input}
+              theme={{ colors: { primary: Colors.primary, outline: Colors.border } }}
+            />
+            <TextInput
+              label={t('patientProfile:birthDatePlaceholder')}
+              value={getFormValue('dateOfBirth')}
+              onChangeText={(text) => updateFormValue('dateOfBirth', text)}
+              mode="outlined"
+              placeholder="YYYY-MM-DD"
+              style={styles.input}
+              theme={{ colors: { primary: Colors.primary, outline: Colors.border } }}
+            />
+            <TextInput
+              label={t('patientProfile:gender')}
+              value={getFormValue('gender')}
+              onChangeText={(text) => updateFormValue('gender', text)}
+              mode="outlined"
+              style={styles.input}
+              theme={{ colors: { primary: Colors.primary, outline: Colors.border } }}
+            />
+            <TextInput
+              label={t('patientProfile:nationality')}
+              value={getFormValue('nationality')}
+              onChangeText={(text) => updateFormValue('nationality', text)}
+              mode="outlined"
+              style={styles.input}
+              theme={{ colors: { primary: Colors.primary, outline: Colors.border } }}
+            />
+            <TextInput
+              label={t('patientProfile:languages')}
+              value={getFormValue('languages')}
+              onChangeText={(text) => updateFormValue('languages', text)}
+              mode="outlined"
+              placeholder={t('patientProfile:languagesPlaceholderHint')}
+              style={styles.input}
+              theme={{ colors: { primary: Colors.primary, outline: Colors.border } }}
+            />
+          </Card.Content>
+          <Card.Actions style={styles.cardActions}>
             <Button onPress={closeEditDialog} disabled={savingSection !== null}>
               {t('patientProfile:cancel')}
             </Button>
             <Button onPress={handleSaveSection} loading={savingSection !== null} mode="contained">
               {t('patientProfile:save')}
             </Button>
-          </Dialog.Actions>
-        </Dialog>
-      </Portal>
+          </Card.Actions>
+        </Card>
+      );
+    }
+
+    return (
+      <Card style={styles.card}>
+        <Card.Content>
+          <View style={styles.heroRow}>
+            <Avatar name={patient.name} uri={patient.avatarUrl} size={72} />
+            <View style={styles.heroInfo}>
+              <Text style={styles.heroName} numberOfLines={2}>
+                {patient.name || t('patientProfile:unknownPatient')}
+              </Text>
+              {patient.email ? <Text style={styles.heroSubtitle}>{patient.email}</Text> : null}
+              {patient.phone ? <Text style={styles.heroSubtitle}>{patient.phone}</Text> : null}
+            </View>
+          </View>
+          <Divider style={styles.divider} />
+          <View style={styles.heroStatsRow}>
+            {renderInfoRow(t('patientProfile:birthDate'), ageDisplay || t('patientProfile:notProvided'))}
+            {renderInfoRow(t('patientProfile:gender'), patient.gender || '')}
+            {renderInfoRow(t('patientProfile:nationality'), patient.nationality || '')}
+          </View>
+        </Card.Content>
+        {canEditProfile ? (
+          <Card.Actions style={styles.cardActions}>
+            <Button mode="contained" icon="pencil" onPress={() => openEditDialog('personal')}>
+              {t('patientProfile:editIdentityAction')}
+            </Button>
+          </Card.Actions>
+        ) : null}
+      </Card>
     );
   };
 
-  const renderLoading = () => (
-    <View style={styles.loadingContainer}>
-      <ActivityIndicator size="large" color={Colors.primary} />
-      <Text style={styles.loadingText}>{t('patientProfile:loadingState')}</Text>
-    </View>
-  );
+  /**
+   * Card for the patient's contact information.  In editing mode, renders
+   * TextInput fields for each address component.
+   */
+  const renderContactCard = () => {
+    if (!patient) return null;
+    if (editingSection === 'contact') {
+      return (
+        <Card style={styles.card}>
+          <Card.Title
+            title={t('patientProfile:editContactTitle')}
+            titleStyle={styles.cardTitle}
+            left={(props) => <Icon {...props} name="map-marker" color={Colors.primary} size={26} />}
+          />
+          <Card.Content>
+            <TextInput
+              label={t('patientProfile:addressLine1')}
+              value={getFormValue('addressLine1')}
+              onChangeText={(text) => updateFormValue('addressLine1', text)}
+              mode="outlined"
+              style={styles.input}
+              theme={{ colors: { primary: Colors.primary, outline: Colors.border } }}
+            />
+            <TextInput
+              label={t('patientProfile:addressLine2')}
+              value={getFormValue('addressLine2')}
+              onChangeText={(text) => updateFormValue('addressLine2', text)}
+              mode="outlined"
+              style={styles.input}
+              theme={{ colors: { primary: Colors.primary, outline: Colors.border } }}
+            />
+            <TextInput
+              label={t('patientProfile:city')}
+              value={getFormValue('addressCity')}
+              onChangeText={(text) => updateFormValue('addressCity', text)}
+              mode="outlined"
+              style={styles.input}
+              theme={{ colors: { primary: Colors.primary, outline: Colors.border } }}
+            />
+            <TextInput
+              label={t('patientProfile:region')}
+              value={getFormValue('addressRegion')}
+              onChangeText={(text) => updateFormValue('addressRegion', text)}
+              mode="outlined"
+              style={styles.input}
+              theme={{ colors: { primary: Colors.primary, outline: Colors.border } }}
+            />
+            <TextInput
+              label={t('patientProfile:postalCode')}
+              value={getFormValue('addressPostalCode')}
+              onChangeText={(text) => updateFormValue('addressPostalCode', text)}
+              mode="outlined"
+              style={styles.input}
+              theme={{ colors: { primary: Colors.primary, outline: Colors.border } }}
+            />
+            <TextInput
+              label={t('patientProfile:country')}
+              value={getFormValue('addressCountry')}
+              onChangeText={(text) => updateFormValue('addressCountry', text)}
+              mode="outlined"
+              style={styles.input}
+              theme={{ colors: { primary: Colors.primary, outline: Colors.border } }}
+            />
+          </Card.Content>
+          <Card.Actions style={styles.cardActions}>
+            <Button onPress={closeEditDialog} disabled={savingSection !== null}>
+              {t('patientProfile:cancel')}
+            </Button>
+            <Button onPress={handleSaveSection} loading={savingSection !== null} mode="contained">
+              {t('patientProfile:save')}
+            </Button>
+          </Card.Actions>
+        </Card>
+      );
+    }
+    // Display mode
+    return (
+      <Card style={styles.card}>
+        <Card.Title
+          title={t('patientProfile:contactsSection')}
+          titleStyle={styles.cardTitle}
+          left={(props) => <Icon {...props} name="map-marker-radius" color={Colors.primary} size={26} />}
+        />
+        <Card.Content>
+          <Text style={styles.infoLabel}>{t('patientProfile:address')}</Text>
+          <Text style={styles.infoValue}>
+            {[
+              patient.address?.line1,
+              patient.address?.line2,
+              patient.address?.city,
+              patient.address?.postalCode,
+              patient.address?.country,
+            ]
+              .filter(Boolean)
+              .join(', ') || t('patientProfile:notProvided')}
+          </Text>
+        </Card.Content>
+        {canEditProfile ? (
+          <Card.Actions style={styles.cardActions}>
+            <Button mode="outlined" onPress={() => openEditDialog('contact')} icon="map-marker">
+              {t('patientProfile:editContactTitle')}
+            </Button>
+          </Card.Actions>
+        ) : null}
+      </Card>
+    );
+  };
 
-  const renderError = () => (
-    <View style={styles.errorContainer}>
-      <Icon name="alert-circle" size={48} color={Colors.error} />
-      <Text style={styles.errorTitle}>{t('patientProfile:errorLoad')}</Text>
-      <Text style={styles.errorMessage}>{error}</Text>
-      <Button mode="contained" onPress={handleRefresh} style={styles.retryButton}>
-        {t('patientProfile:retry')}
-      </Button>
-    </View>
-  );
+  /**
+   * Card for emergency contact information.  Editing mode displays form inputs
+   * for the emergency contact details.
+   */
+  const renderEmergencyCard = () => {
+    if (!patient) return null;
+    if (editingSection === 'emergency') {
+      return (
+        <Card style={styles.card}>
+          <Card.Title
+            title={t('patientProfile:editEmergencyTitle')}
+            titleStyle={styles.cardTitle}
+            left={(props) => <Icon {...props} name="phone" color={Colors.primary} size={26} />}
+          />
+          <Card.Content>
+            <TextInput
+              label={t('patientProfile:emergencyName')}
+              value={getFormValue('emergencyName')}
+              onChangeText={(text) => updateFormValue('emergencyName', text)}
+              mode="outlined"
+              style={styles.input}
+              theme={{ colors: { primary: Colors.primary, outline: Colors.border } }}
+            />
+            <TextInput
+              label={t('patientProfile:emergencyRelation')}
+              value={getFormValue('emergencyRelation')}
+              onChangeText={(text) => updateFormValue('emergencyRelation', text)}
+              mode="outlined"
+              style={styles.input}
+              theme={{ colors: { primary: Colors.primary, outline: Colors.border } }}
+            />
+            <TextInput
+              label={t('patientProfile:emergencyPhone')}
+              value={getFormValue('emergencyPhone')}
+              onChangeText={(text) => updateFormValue('emergencyPhone', text)}
+              mode="outlined"
+              keyboardType="phone-pad"
+              style={styles.input}
+              theme={{ colors: { primary: Colors.primary, outline: Colors.border } }}
+            />
+          </Card.Content>
+          <Card.Actions style={styles.cardActions}>
+            <Button onPress={closeEditDialog} disabled={savingSection !== null}>
+              {t('patientProfile:cancel')}
+            </Button>
+            <Button onPress={handleSaveSection} loading={savingSection !== null} mode="contained">
+              {t('patientProfile:save')}
+            </Button>
+          </Card.Actions>
+        </Card>
+      );
+    }
+    return (
+      <Card style={styles.card}>
+        <Card.Title
+          title={t('patientProfile:emergencyContact')}
+          titleStyle={styles.cardTitle}
+          left={(props) => <Icon {...props} name="phone-alert" color={Colors.primary} size={26} />}
+        />
+        <Card.Content>
+          {patient.emergencyContact ? (
+            <View style={styles.infoGrid}>
+              {renderInfoRow(t('patientProfile:emergencyName'), patient.emergencyContact.name || '')}
+              {renderInfoRow(t('patientProfile:emergencyRelation'), patient.emergencyContact.relation || '')}
+              {renderInfoRow(t('patientProfile:emergencyPhone'), patient.emergencyContact.phone || '')}
+            </View>
+          ) : (
+            <Text style={styles.emptyText}>{t('patientProfile:notProvided')}</Text>
+          )}
+        </Card.Content>
+        {canEditProfile ? (
+          <Card.Actions style={styles.cardActions}>
+            <Button mode="outlined" onPress={() => openEditDialog('emergency')} icon="phone">
+              {t('patientProfile:editEmergencyTitle')}
+            </Button>
+          </Card.Actions>
+        ) : null}
+      </Card>
+    );
+  };
 
-  const renderEmpty = () => (
-    <View style={styles.emptyContainer}>
-      <Icon name="account-off" size={48} color={Colors.textSecondary} />
-      <Text style={styles.emptyTitle}>{t('patientProfile:noDataTitle')}</Text>
-      <Text style={styles.emptySubtitle}>{t('patientProfile:noDataSubtitle')}</Text>
-    </View>
-  );
+  /**
+   * Card for medical information.  Editing mode allows the user to change
+   * blood group, insurance number, allergies, medical history and current treatments.
+   */
+  const renderMedicalCard = () => {
+    if (!patient) return null;
+    if (editingSection === 'medical') {
+      return (
+        <Card style={styles.card}>
+          <Card.Title
+            title={t('patientProfile:editMedicalTitle')}
+            titleStyle={styles.cardTitle}
+            left={(props) => <Icon {...props} name="medical-bag" color={Colors.primary} size={26} />}
+          />
+          <Card.Content>
+            <TextInput
+              label={t('patientProfile:bloodGroup')}
+              value={getFormValue('bloodGroup')}
+              onChangeText={(text) => updateFormValue('bloodGroup', text)}
+              mode="outlined"
+              style={styles.input}
+              theme={{ colors: { primary: Colors.primary, outline: Colors.border } }}
+            />
+            <TextInput
+              label={t('patientProfile:insurance')}
+              value={getFormValue('insuranceNumber')}
+              onChangeText={(text) => updateFormValue('insuranceNumber', text)}
+              mode="outlined"
+              style={styles.input}
+              theme={{ colors: { primary: Colors.primary, outline: Colors.border } }}
+            />
+            <TextInput
+              label={t('patientProfile:allergies')}
+              value={getFormValue('allergies')}
+              onChangeText={(text) => updateFormValue('allergies', text)}
+              mode="outlined"
+              multiline
+              numberOfLines={2}
+              placeholder={t('patientProfile:languagesPlaceholderHint')}
+              style={styles.input}
+              theme={{ colors: { primary: Colors.primary, outline: Colors.border } }}
+            />
+            <TextInput
+              label={t('patientProfile:medicalHistory')}
+              value={getFormValue('medicalHistory')}
+              onChangeText={(text) => updateFormValue('medicalHistory', text)}
+              mode="outlined"
+              multiline
+              numberOfLines={4}
+              placeholder="Un élément par ligne"
+              style={styles.input}
+              theme={{ colors: { primary: Colors.primary, outline: Colors.border } }}
+            />
+            <TextInput
+              label={t('patientProfile:currentTreatments')}
+              value={getFormValue('currentTreatments')}
+              onChangeText={(text) => updateFormValue('currentTreatments', text)}
+              mode="outlined"
+              multiline
+              numberOfLines={4}
+              placeholder="Un traitement par ligne"
+              style={styles.input}
+              theme={{ colors: { primary: Colors.primary, outline: Colors.border } }}
+            />
+          </Card.Content>
+          <Card.Actions style={styles.cardActions}>
+            <Button onPress={closeEditDialog} disabled={savingSection !== null}>
+              {t('patientProfile:cancel')}
+            </Button>
+            <Button onPress={handleSaveSection} loading={savingSection !== null} mode="contained">
+              {t('patientProfile:save')}
+            </Button>
+          </Card.Actions>
+        </Card>
+      );
+    }
+    // Display mode
+    return (
+      <Card style={styles.card}>
+        <Card.Title
+          title={t('patientProfile:medicalInfo')}
+          titleStyle={styles.cardTitle}
+          left={(props) => <Icon {...props} name="medical-bag" color={Colors.primary} size={26} />}
+        />
+        <Card.Content>
+          <View style={styles.infoGrid}>
+            {renderInfoRow(t('patientProfile:bloodGroup'), patient.bloodGroup || '')}
+            {renderInfoRow(t('patientProfile:insurance'), patient.insuranceNumber || '')}
+          </View>
+          <Divider style={styles.divider} />
+          {renderChipList(t('patientProfile:allergies'), patient.allergies)}
+          <Divider style={styles.divider} />
+          {renderBulletList(t('patientProfile:medicalHistory'), patient.medicalHistory)}
+          <Divider style={styles.divider} />
+          {renderBulletList(t('patientProfile:currentTreatments'), patient.currentTreatments, 'pill')}
+        </Card.Content>
+        {canEditProfile ? (
+          <Card.Actions style={styles.cardActions}>
+            <Button mode="outlined" onPress={() => openEditDialog('medical')} icon="pencil">
+              {t('patientProfile:editMedicalTitle')}
+            </Button>
+          </Card.Actions>
+        ) : null}
+      </Card>
+    );
+  };
 
+  /**
+   * Render the appropriate content based on loading and error state.
+   * Only the hero, contact, emergency and medical cards are included per the
+   * updated design brief.  The overview and documents sections have been
+   * removed to focus on core medical and contact information.
+   */
   const renderContent = () => {
-    if (loading) return renderLoading();
-    if (error) return renderError();
-    if (!patient) return renderEmpty();
-
+    if (loading) {
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+          <Text style={styles.loadingText}>{t('patientProfile:loadingState')}</Text>
+        </View>
+      );
+    }
+    if (error) {
+      return (
+        <View style={styles.errorContainer}>
+          <Icon name="alert-circle" size={48} color={Colors.error} />
+          <Text style={styles.errorTitle}>{t('patientProfile:errorLoad')}</Text>
+          <Text style={styles.errorMessage}>{error}</Text>
+          <Button mode="contained" onPress={handleRefresh} style={styles.retryButton}>
+            {t('patientProfile:retry')}
+          </Button>
+        </View>
+      );
+    }
+    if (!patient) {
+      return (
+        <View style={styles.emptyContainer}>
+          <Icon name="account-off" size={48} color={Colors.textSecondary} />
+          <Text style={styles.emptyTitle}>{t('patientProfile:noDataTitle')}</Text>
+          <Text style={styles.emptySubtitle}>{t('patientProfile:noDataSubtitle')}</Text>
+        </View>
+      );
+    }
     return (
       <View style={styles.sectionStack}>
-        {renderHeroCard()}
-        {renderOverviewCard()}
+        {renderPersonalCard()}
         {renderContactCard()}
         {renderEmergencyCard()}
         {renderMedicalCard()}
-        {renderDocumentsCard()}
       </View>
     );
   };
 
   return (
     <>
-      <HeaderBar title={t('patientProfile:title')} onBack={() => navigation.goBack()} style={styles.headerBar} />
+      <HeaderBar
+        title={t('patientProfile:title')}
+        onBack={() => navigation.goBack()}
+        // Right actions removed for cleaner design; editing is handled within each card
+        rightActions={[]}
+        style={styles.headerBar}
+      />
       <Screen scroll={false} padded={false} style={styles.screen}>
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={[Colors.primary]} />}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              colors={[Colors.primary]}
+            />
+          }
           showsVerticalScrollIndicator={false}
         >
           {renderContent()}
         </ScrollView>
       </Screen>
-
-      {renderEditDialog()}
-
       <Snackbar
         visible={!!snackbar}
         onDismiss={() => setSnackbar(null)}
@@ -974,6 +986,9 @@ export default function PatientProfileScreen() {
   );
 }
 
+// Styles definition.  The spacing, colours and typography have been tuned for a
+// cleaner, more refined appearance.  Cards use subtle shadows and generous
+// padding to create a sense of depth without overwhelming the content.
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
@@ -1097,28 +1112,6 @@ const styles = StyleSheet.create({
     marginVertical: Spacing.sm,
     backgroundColor: Colors.border,
   },
-  documentRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    paddingVertical: Spacing.sm,
-  },
-  documentInfo: {
-    flex: 1,
-  },
-  documentName: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: Colors.text,
-  },
-  documentMeta: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-  },
-  uploadButton: {
-    alignSelf: 'flex-start',
-    marginBottom: Spacing.sm,
-  },
   loadingContainer: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -1163,13 +1156,6 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     color: Colors.textSecondary,
-  },
-  dialog: {
-    maxHeight: '80%',
-  },
-  dialogContent: {
-    paddingHorizontal: Spacing.md,
-    paddingBottom: Spacing.md,
   },
   input: {
     marginBottom: Spacing.md,
