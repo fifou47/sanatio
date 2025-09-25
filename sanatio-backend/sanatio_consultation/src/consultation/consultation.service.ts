@@ -130,8 +130,7 @@ export class ConsultationService {
     // Vérifier si l'utilisateur a le droit de rejoindre la consultation
     const isPatient = consultation.patientUserId === userId;
     const isDoctor = consultation.doctorUserId === userId;
-    const isAdditionalUser = consultation.additionalUserIds.includes(userId);
-
+    const isAdditionalUser = !!consultation.additionalUserIds?.includes(userId);
     if (!isPatient && !isDoctor && !isAdditionalUser) {
       throw new ForbiddenException('You are not authorized to join this consultation');
     }
