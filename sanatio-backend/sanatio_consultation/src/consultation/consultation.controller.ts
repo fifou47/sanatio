@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Query } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Query, Req } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { ConsultationService } from './consultation.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -52,4 +52,15 @@ export class ConsultationController {
   @Delete(':id')
   @ApiOperation({ summary: 'Annuler une consultation' })
   remove(@Param('id') id: string) { return this.svc.remove(id); }
+
+  @Post(':id/join')
+  @ApiOperation({ summary: "Obtenir un jeton d'accès pour rejoindre une consultation vidéo" })
+  getJoinToken(
+    @Param('id') id: string,
+    @Req() req: any, // On utilise @Req pour obtenir l'utilisateur du jeton JWT
+  ) {
+    // En supposant que le guard JWT attache l'utilisateur (avec son ID) à la requête
+    const userId = req.user.sub;
+    return this.svc.generateJoinToken(id, userId);
+  }
 }

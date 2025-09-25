@@ -1,9 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { HttpService } from '@nestjs/axios';
-import { firstValueFrom } from 'rxjs';
+import { AccessToken } from 'livekit-server-sdk';
 import { Consultation, ConsultationDocument } from './schemas/consultation.schema';
 import { CreateConsultationDto } from './dto/create-consultation.dto';
 import { ChangeStatusDto } from './dto/change-status.dto';
@@ -14,27 +13,22 @@ interface TimeSlot {
   end: string;
 }
 
+import { ConfigService } from '@nestjs/config';
+
 @Injectable()
 export class ConsultationService {
-  private readonly doctorSvcUrl = 'http://sanatio-doctor:3000';
-
   constructor(
     @InjectModel(Consultation.name) private consModel: Model<ConsultationDocument>,
     private events: EventEmitter2,
-    private http: HttpService,
+    private configService: ConfigService,
   ) {}
 
   async create(dto: CreateConsultationDto) {
     const start = new Date(dto.startTime);
     const end = new Date(start.getTime() + dto.duration * 60000);
 
-    // 1. Vérifier si le créneau est valide dans les disponibilités du médecin
-    const isSlotAvailable = await this._isSlotInDoctorAvailability(dto.doctorId, start, dto.duration);
-    if (!isSlotAvailable) {
-      throw new BadRequestException('The requested time slot is not available for this doctor.');
-    }
-
-    // 2. Conflit: même docteur durant l’intervalle (double sécurité)
+    // La vérification de la disponibilité est désormais de la responsabilité du client.
+    // Nous ne gardons que la vérification de conflit pour éviter les race conditions.
     const overlap = await this.consModel.exists({
       doctorId: dto.doctorId,
       $expr: {
@@ -127,19 +121,43 @@ export class ConsultationService {
     if (!res) throw new NotFoundException('Consultation not found');
   }
 
-  private async _isSlotInDoctorAvailability(doctorId: string, start: Date, duration: number): Promise<boolean> {
-    try {
-      const url = `${this.doctorSvcUrl}/doctors/${doctorId}/availability/slots?from=${start.toISOString()}&duration=${duration}`;
-      const response = await firstValueFrom(this.http.get<TimeSlot[]>(url));
-      const availableSlots = response.data;
-
-      const requestedStartTime = start.getTime();
-
-      return availableSlots.some(slot => new Date(slot.start).getTime() === requestedStartTime);
-    } catch (error) {
-      console.error('Error checking doctor availability:', error.message);
-      // Par sécurité, si le service de disponibilité ne répond pas, on refuse la réservation.
-      return false;
+  async generateJoinToken(consultationId: string, userId: string) {
+    const consultation = await this.consModel.findById(consultationId);
+    if (!consultation) {
+      throw new NotFoundException('Consultation not found');
     }
+
+    // Vérifier si l'utilisateur a le droit de rejoindre la consultation
+    const isPatient = consultation.patientUserId === userId;
+    const isDoctor = consultation.doctorUserId === userId;
+    const isAdditionalUser = consultation.additionalUserIds.includes(userId);
+
+    if (!isPatient && !isDoctor && !isAdditionalUser) {
+      throw new ForbiddenException('You are not authorized to join this consultation');
+    }
+
+    const roomName = consultationId;
+    const participantName = userId; // Ou un nom d'utilisateur plus descriptif
+
+    const livekitApiKey = this.configService.get<string>('LIVEKIT_API_KEY');
+    const livekitApiSecret = this.configService.get<string>('LIVEKIT_API_SECRET');
+    const livekitHost = this.configService.get<string>('LIVEKIT_HOST');
+
+    if (!livekitApiKey || !livekitApiSecret || !livekitHost) {
+      throw new Error('LiveKit configuration is missing');
+    }
+
+    const at = new AccessToken(livekitApiKey, livekitApiSecret, {
+      identity: participantName,
+    });
+
+    at.addGrant({
+      room: roomName,
+      roomJoin: true,
+      canPublish: true,
+      canSubscribe: true,
+    });
+
+    return { token: at.toJwt() };
   }
 }

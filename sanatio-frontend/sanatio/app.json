@@ -35,6 +35,23 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      [
+        "@livekit/react-native",
+        {
+          "android": {
+            "permissions": [
+              "android.permission.CAMERA",
+              "android.permission.RECORD_AUDIO"
+            ]
+          },
+          "ios": {
+            "cameraPermission": "L'application a besoin d'accéder à votre caméra pour les consultations vidéo.",
+            "microphonePermission": "L'application a besoin d'accéder à votre micro pour les consultations vidéo."
+          }
+        }
+      ]
+    ]
   }
 }

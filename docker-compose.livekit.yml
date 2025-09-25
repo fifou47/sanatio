@@ -1,0 +1,25 @@
+version: '3.9'
+
+services:
+  redis:
+    image: redis:7-alpine
+    command: redis-server --requirepass ${REDIS_PASSWORD:-redis-password} # Vous pouvez changer le mot de passe ici
+
+  livekit:
+    image: livekit/livekit-server:v1.5
+    command: --config /etc/livekit.yaml
+    restart: unless-stopped
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml
+    ports:
+      - "7880:7880" # Port pour les clients
+      - "7881:7881" # Port pour les WebSockets
+      - "7882:7882" # Port pour les WebRTC
+      - "50000-60000:50000-60000/udp" # Plage de ports pour les médias
+    depends_on:
+      - redis
+    env_file:
+      - .env.livekit
+    environment:
+      - LIVEKIT_KEYS=${LIVEKIT_API_KEY}:${LIVEKIT_API_SECRET}
+      - REDIS_PASSWORD=${REDIS_PASSWORD}

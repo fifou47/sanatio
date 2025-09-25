@@ -10,6 +10,7 @@ import AuthStack, { AuthStackParamList } from './AuthStack';
 import MainTabs from './MainTabs';
 import RequireAuthScreen from '../screens/RequireAuthScreen';
 import PatientProfileScreen from '../screens/PatientProfileScreen';
+import { CallScreen } from '../screens/CallScreen';
 import { useAuth } from '../store/auth';
 import { View, ActivityIndicator } from 'react-native';
 import * as Linking from 'expo-linking';
@@ -24,6 +25,7 @@ export type RootParamList = {
   AuthStack: NavigatorScreenParams<AuthStackParamList> | undefined;
   RequireAuth: undefined;
   PatientProfile: { patientId?: string } | undefined;
+  Call: { url: string; token: string };
 };
 
 const Stack = createNativeStackNavigator<RootParamList>();
@@ -84,6 +86,11 @@ export default function RootNavigator() {
           options={{ presentation: 'fullScreenModal' }}
         />
         <Stack.Screen name="PatientProfile" component={PatientProfileScreen} />
+        <Stack.Screen
+          name="Call"
+          component={CallScreen}
+          options={{ presentation: 'fullScreenModal', headerShown: false }}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );

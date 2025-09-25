@@ -1,0 +1,10 @@
+port: 7880
+redis:
+  address: redis:6379
+  password: ${REDIS_PASSWORD}
+keys: ${LIVEKIT_KEYS}
+
+# Optionnel : Activer le logging pour le développement
+logging:
+  level: info
+  pion_level: info
