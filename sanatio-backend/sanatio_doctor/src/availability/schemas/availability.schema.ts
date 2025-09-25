@@ -12,8 +12,6 @@ export class AvailabilitySlot {
   @Prop({ required: true })
   end: Date;
 
-  @Prop({ default: false })
-  isBooked: boolean;
 }
 
 export type AvailabilitySlotDocument = AvailabilitySlot & Document;

@@ -1,8 +1,7 @@
-import { Controller, Get, Post, Param, Body, Delete, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, Delete, UseGuards, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { AvailabilityService } from './availability.service';
 import { CreateAvailabilityDto } from './dto/create-availability.dto';
-import { BookAvailabilityDto } from './dto/update-availability.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 
 @ApiTags('Availability')
@@ -18,20 +17,22 @@ export class AvailabilityController {
     return this.svc.findAll(doctorId);
   }
 
+  @Get('slots')
+  @ApiOperation({ summary: 'Get available time slots for booking' })
+  getAvailableTimeSlots(
+    @Param('doctorId') doctorId: string,
+    @Query('from') from: string,
+    @Query('duration') duration: string,
+  ) {
+    const fromDate = from ? new Date(from) : new Date();
+    const consultationDuration = duration ? parseInt(duration, 10) : 30;
+    return this.svc.getAvailableTimeSlots(doctorId, fromDate, consultationDuration);
+  }
+
   @Post()
   @ApiOperation({ summary: 'Create an availability slot' })
   create(@Param('doctorId') doctorId: string, @Body() dto: CreateAvailabilityDto) {
     return this.svc.create(doctorId, dto);
-  }
-
-  @Post(':slotId/book')
-  @ApiOperation({ summary: 'Book an availability slot' })
-  book(
-    @Param('doctorId') doctorId: string,
-    @Param('slotId') slotId: string,
-    @Body() dto: BookAvailabilityDto,
-  ) {
-    return this.svc.book(doctorId, slotId, dto);
   }
 
   @Delete(':slotId')

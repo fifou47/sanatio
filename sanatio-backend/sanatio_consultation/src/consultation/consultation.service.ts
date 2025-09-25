@@ -1,24 +1,40 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { Model } from 'mongoose';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { HttpService } from '@nestjs/axios';
+import { firstValueFrom } from 'rxjs';
 import { Consultation, ConsultationDocument } from './schemas/consultation.schema';
 import { CreateConsultationDto } from './dto/create-consultation.dto';
 import { ChangeStatusDto } from './dto/change-status.dto';
 import { UpdateConsultationDto } from './dto/update-consultation.dto';
 
+interface TimeSlot {
+  start: string;
+  end: string;
+}
+
 @Injectable()
 export class ConsultationService {
+  private readonly doctorSvcUrl = 'http://sanatio-doctor:3000';
+
   constructor(
     @InjectModel(Consultation.name) private consModel: Model<ConsultationDocument>,
     private events: EventEmitter2,
+    private http: HttpService,
   ) {}
 
   async create(dto: CreateConsultationDto) {
     const start = new Date(dto.startTime);
     const end = new Date(start.getTime() + dto.duration * 60000);
 
-    // Conflit: même docteur durant l’intervalle
+    // 1. Vérifier si le créneau est valide dans les disponibilités du médecin
+    const isSlotAvailable = await this._isSlotInDoctorAvailability(dto.doctorId, start, dto.duration);
+    if (!isSlotAvailable) {
+      throw new BadRequestException('The requested time slot is not available for this doctor.');
+    }
+
+    // 2. Conflit: même docteur durant l’intervalle (double sécurité)
     const overlap = await this.consModel.exists({
       doctorId: dto.doctorId,
       $expr: {
@@ -47,6 +63,17 @@ export class ConsultationService {
   }
 
   async findAll() { return this.consModel.find().exec(); }
+
+  async findAllForDoctor(doctorId: string, from?: Date, to?: Date) {
+    const query: any = { doctorId };
+    if (from || to) {
+      query.startTime = {};
+      if (from) query.startTime.$gte = from;
+      if (to) query.startTime.$lte = to;
+    }
+    return this.consModel.find(query).exec();
+  }
+
   async findOne(id: string) {
     const c = await this.consModel.findById(id);
     if (!c) throw new NotFoundException('Consultation not found');
@@ -98,5 +125,21 @@ export class ConsultationService {
   async remove(id: string) {
     const res = await this.consModel.findByIdAndDelete(id);
     if (!res) throw new NotFoundException('Consultation not found');
+  }
+
+  private async _isSlotInDoctorAvailability(doctorId: string, start: Date, duration: number): Promise<boolean> {
+    try {
+      const url = `${this.doctorSvcUrl}/doctors/${doctorId}/availability/slots?from=${start.toISOString()}&duration=${duration}`;
+      const response = await firstValueFrom(this.http.get<TimeSlot[]>(url));
+      const availableSlots = response.data;
+
+      const requestedStartTime = start.getTime();
+
+      return availableSlots.some(slot => new Date(slot.start).getTime() === requestedStartTime);
+    } catch (error) {
+      console.error('Error checking doctor availability:', error.message);
+      // Par sécurité, si le service de disponibilité ne répond pas, on refuse la réservation.
+      return false;
+    }
   }
 }

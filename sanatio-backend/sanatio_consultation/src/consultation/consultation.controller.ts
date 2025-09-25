@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Query } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { ConsultationService } from './consultation.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -20,6 +20,18 @@ export class ConsultationController {
   @Get()
   @ApiOperation({ summary: 'Lister toutes les consultations' })
   findAll() { return this.svc.findAll(); }
+
+  @Get('doctor/:doctorId')
+  @ApiOperation({ summary: 'Lister les consultations pour un médecin (inter-service)' })
+  findAllForDoctor(
+    @Param('doctorId') doctorId: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    const fromDate = from ? new Date(from) : undefined;
+    const toDate = to ? new Date(to) : undefined;
+    return this.svc.findAllForDoctor(doctorId, fromDate, toDate);
+  }
 
   @Get(':id')
   @ApiParam({ name: 'id' })
